@@ -1,21 +1,26 @@
 pipeline {
     agent any
-    triggers { pollSCM('H/5 * * * *') } // vérifie tous les 5 min
+    triggers { pollSCM('H/5 * * * *') } // Vérifie toutes les 5 minutes les changements
     environment {
-        IMAGE_SERVER = 'youruser/mern-server' // changez "youruser"
-        IMAGE_CLIENT = 'youruser/mern-client' // changez "youruser"
+        IMAGE_SERVER = 'azizromdhane/mern-server' // DockerHub
+        IMAGE_CLIENT = 'azizromdhane/mern-client'
     }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
+                git(
+                    branch: 'main',
                     url: 'git@github.com:azizromdhane/mern_app.git',
-                    credentialsId: 'github_ssh' // clé SSH ajoutée dans Jenkins
+                    credentialsId: 'github_ssh' // Clé SSH GitHub dans Jenkins
+                )
             }
         }
 
         stage('Build + Push SERVER') {
-            when { changeset "server/**" } // build uniquement si dossier server modifié
+            when {
+                changeset pattern: 'server/**', comparator: 'ANT'
+            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
@@ -32,7 +37,9 @@ pipeline {
         }
 
         stage('Build + Push CLIENT') {
-            when { changeset "client/**" } // build uniquement si dossier client modifié
+            when {
+                changeset pattern: 'client/**', comparator: 'ANT'
+            }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
@@ -49,12 +56,17 @@ pipeline {
         }
 
         stage('Scan SERVER with Trivy') {
-            when { changeset "server/**" }
+            when {
+                changeset pattern: 'server/**', comparator: 'ANT'
+            }
             steps {
                 sh '''
+                    echo "🔍 Scanning image with Trivy..."
                     docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                     aquasec/trivy image $IMAGE_SERVER:${BUILD_NUMBER} > trivy_report.txt || true
-                    cat trivy_report.txt
+
+                    echo "=== Résumé du rapport Trivy ==="
+                    cat trivy_report.txt | grep -E "CRITICAL|HIGH|MEDIUM" || true
                 '''
             }
         }
@@ -62,7 +74,8 @@ pipeline {
 
     post {
         always {
-            sh 'docker system prune -af || true' // nettoyage
+            echo "🧹 Nettoyage du système Docker..."
+            sh 'docker system prune -af || true'
         }
     }
 }
