@@ -9,13 +9,13 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: 'git@gitlab.com/yourgroup/yourrepo.git',
-                    credentialsId: 'gitlab_ssh'
+                    url: 'git@github.com:azizromdhane/mern_app.git',
+                    credentialsId: 'github_ssh' // clé SSH ajoutée dans Jenkins
             }
         }
 
         stage('Build + Push SERVER') {
-            when { changeset "server/**" } // ne build que si serveur modifié
+            when { changeset "server/**" } // build uniquement si dossier server modifié
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
@@ -32,7 +32,7 @@ pipeline {
         }
 
         stage('Build + Push CLIENT') {
-            when { changeset "client/**" } // ne build que si client modifié
+            when { changeset "client/**" } // build uniquement si dossier client modifié
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
