@@ -1,0 +1,31 @@
+image: docker:24
+services:
+  - docker:24-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
+
+stages: [build_push]
+
+.docker_login: &docker_login
+  - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
+
+build_push_server:
+  stage: build_push
+  rules:
+    - changes: ["server/**/*"]
+  script:
+    - *docker_login
+    - docker build -t "$DOCKERHUB_USER/mern_server:$CI_COMMIT_SHORT_SHA" server
+    - docker push "$DOCKERHUB_USER/mern_server:$CI_COMMIT_SHORT_SHA"
+
+build_push_client:
+  stage: build_push
+  rules:
+    - changes: ["client/**/*"]
+  script:
+    - *docker_login
+    - docker build -t "$DOCKERHUB_USER/mern_client:$CI_COMMIT_SHORT_SHA" client
+    - docker push "$DOCKERHUB_USER/mern_client:$CI_COMMIT_SHORT_SHA"
