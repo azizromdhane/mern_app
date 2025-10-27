@@ -1,18 +1,23 @@
 pipeline {
     agent any
-    triggers { pollSCM('H/5 * * * *') } // Vérifie toutes les 5 minutes les changements
+
+    // Vérifie les changements sur GitHub toutes les 5 minutes
+    triggers { pollSCM('H/5 * * * *') }
+
     environment {
         IMAGE_SERVER = 'azizromdhane/mern-server' // DockerHub
         IMAGE_CLIENT = 'azizromdhane/mern-client'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
+                echo "🔁 Clonage du dépôt GitHub..."
                 git(
                     branch: 'main',
                     url: 'git@github.com:azizromdhane/mern_app.git',
-                    credentialsId: 'github_ssh' // Clé SSH GitHub dans Jenkins
+                    credentialsId: 'github_ssh' // Doit exister dans Jenkins
                 )
             }
         }
@@ -22,6 +27,7 @@ pipeline {
                 changeset pattern: 'server/**', comparator: 'ANT'
             }
             steps {
+                echo "⚙️ Construction et push de l'image du serveur..."
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
                     usernameVariable: 'DH_USER',
@@ -41,6 +47,7 @@ pipeline {
                 changeset pattern: 'client/**', comparator: 'ANT'
             }
             steps {
+                echo "⚙️ Construction et push de l'image du client..."
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
                     usernameVariable: 'DH_USER',
@@ -60,8 +67,8 @@ pipeline {
                 changeset pattern: 'server/**', comparator: 'ANT'
             }
             steps {
+                echo "🔍 Scan de l'image serveur avec Trivy..."
                 sh '''
-                    echo "🔍 Scanning image with Trivy..."
                     docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                     aquasec/trivy image $IMAGE_SERVER:${BUILD_NUMBER} > trivy_report.txt || true
 
@@ -76,6 +83,12 @@ pipeline {
         always {
             echo "🧹 Nettoyage du système Docker..."
             sh 'docker system prune -af || true'
+        }
+        success {
+            echo "✅ Pipeline terminé avec succès !"
+        }
+        failure {
+            echo "❌ Échec du pipeline — vérifier les logs."
         }
     }
 }
